@@ -1,6 +1,10 @@
+# Load packages -----------------------------------------------------------
+
 library(numDeriv)
 library(sparklyr)
 library(tidyverse)
+
+# Define functions --------------------------------------------------------
 
 calc_grad <- function(f) {
   force(f)
