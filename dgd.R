@@ -19,7 +19,7 @@ make_main_tbl <- function(f_list,
     f = f_list,
     grad = grad_list,
     curr_x = init_xs,
-    step_size = init_step_size,
+    curr_step_size = init_step_size,
     weights = apply(weight_mat, 1, identity, simplify = FALSE)
   )
 }
