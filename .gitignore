@@ -2,6 +2,7 @@
 .DS_Store
 
 # Everything below comes from GitHub's R .gitignore template
+# https://github.com/github/gitignore/blob/main/R.gitignore
 
 # History files
 .Rhistory
