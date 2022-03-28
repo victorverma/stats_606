@@ -1,0 +1,45 @@
+\documentclass[11pt]{article}
+\usepackage{fullpage,graphicx,psfrag,amsmath,amsfonts,verbatim}
+\usepackage[small,bf]{caption}
+
+\input defs.tex
+
+\bibliographystyle{alpha}
+
+\title{STATS 606 - Project Proposal \\ \large A Distributed Optimization Package for R}
+\author{Benjamin Osafo Agyare \and Eduardo Ochoa \and Victor Verma}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+Given a convex optimization problem, we say that it is a distributed optimization problem if we can express the global objective function as a sum of local objective functions belonging to different agents situated in a network \cite{Tao:2019}:
+    
+$$ \min_{x \in \mathbb{R}^n} \sum_{i=1}^n f_i(x)$$
+    
+Every agent minimizes its own objective function while exchanging information with other agents in the network.
+    
+Many machine learning and data analytics problems are of a scale that requires distributed optimization. However, most of the research papers about distributed optimization that we have seen focus on applications in electrical and digital systems. Given the algorithms' nature, we believe that they are well-suited to statistical problems like classification problems, regression analyses, etc.
+    
+Under the distributed optimization framework, there are discrete-time and continuous-time algorithms. The former are more developed in the literature and are more feasible to implement. For our project, we will aim to implement two discrete-time algorithms: Distributed Gradient Descent (DGD) \cite{Nedic:2009} and the Exact First-Order Algorithm (EXTRA) \cite{Wei:2015}. One of the principal differences between these two algorithms is the choice of step size. DGD uses diminishing step sizes; specifically, at time instant (step) $k$, agent $i$ runs the following update:
+    
+$$x_i(k+1) = \sum_{j=1}^N w_{ij}(k) x_j(k) - \alpha (k) s_i(k),$$
+    
+where $x_i(k) \in \mathbb{R}^n$ is agent $i$’s estimate of the optimal solution at time instant $k$, $w_{ij}(k)$ is the weight of the edge linking agents $i$ and $j$, $s_i(k)$ is the (sub)gradient of the local objective function, and $\alpha(k) > 0$ is the diminishing step size. In contrast, EXTRA uses fixed step sizes. Another difference is that EXTRA has a two-stage structure that DGD doesn't have. In the first stage, agent $i$ performs the following update:
+    
+$$x_i(1) = \sum_{j=1}^N w_{ij} x_j(0) - \alpha \nabla f_i (x_i(0))$$
+    
+In the second stage, agent $i$ performs another update:
+    
+$$x_i(k+2) = x_i(k+1) + \sum_{j=1}^N w_{ij}x_j(k+1) - \sum_{j=1}^N \Tilde{w}_{ij}x_j(k) - \alpha(\nabla f_i (x_i(k+1)) - \nabla f_i (x_i(k)))$$
+
+We intend to create an R package that implements DGD and EXTRA. To ensure that there isn't already an R package that does this, we searched for distributed optimization packages in several ways. First, we looked at the CRAN task view for optimization and mathematical programming \cite{Theussl:2022}. The task view describes all the packages on CRAN that can be used for optimization. Searching for strings like "distrib" and "DGD" and perusing the descriptions turned up nothing. We also found nothing when we searched for R repositories on GitHub using queries like "distributed optimization" and "distributed gradient descent".
+
+We plan to use Apache Spark to carry out the computations. Our package will interface with Spark through the \texttt{sparklyr} package \cite{Luraschi:2022}. We will include in the package one R function for each distributed optimization algorithm. An R function will take a list of local objective functions, an optional list of gradients, a matrix of weights, and a vector of initial values. If the user doesn't supply gradients, our functions will approximate them using the package \texttt{numDeriv} \cite{Gilbert:2019} or something similar. The three of us have used R extensively, so we believe that we have the skills and experience to accomplish our goal.
+
+We plan to try out the package on two statistical learning problems and compare its performance to that of the centralized optimization algorithm. We will fit a linear regression and a logistic regression model with a massive data set. If time permits, we will also try it on other machine learning problems like neural networks.
+
+\newpage
+\bibliography{template}
+
+\end{document}
