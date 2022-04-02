@@ -1,5 +1,7 @@
-# Apple files - added by Victor
+# Added by Victor
 .DS_Store
+derby.log
+logs/
 
 # Everything below comes from GitHub's R .gitignore template
 # https://github.com/github/gitignore/blob/main/R.gitignore
