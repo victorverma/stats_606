@@ -24,11 +24,6 @@ make_main_tbl <- function(f_list,
     grad = grad_list,
     weights = apply(weight_mat, 1, identity, simplify = FALSE),
     curr_x = init_xs,
-    curr_step_size = init_step_size,
-    curr_weighted_sum = map2(
-      weights,
-      list(curr_x),
-      function(weights_, curr_x_) map2(weights_, curr_x_, `*`) %>% reduce(`+`)
-    )
+    curr_step_size = init_step_size
   )
 }
