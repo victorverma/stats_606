@@ -68,3 +68,27 @@ perform_dgd_update <- function(main_tbl) {
     map(unname)
   mutate(main_tbl, curr_x = next_xs)
 }
+
+# Test the code -----------------------------------------------------------
+
+sc <- spark_connect(master = "local")
+
+main_tbl <- make_main_tbl(
+  f_list = list(
+    function(x) sum(x^2) + 1,
+    function(x) sum(x^2) + 2,
+    function(x) sum(x^2) + 3
+  ),
+  grad_list = NULL,
+  init_xs = list(c(1, 1), c(1, -1), c(-1, -1)),
+  init_step_size = 0.1,
+  weight_mat = rbind(rep(1 / 3, 3), c(0.25, 0.5, 0.25), c(0.5, 0.3, 0.2))
+)
+
+cat("Iter 0\n")
+main_tbl %>% pull(curr_x) %>% print()
+for (iter in 1:10) {
+  main_tbl <- perform_dgd_update(main_tbl)
+  cat(str_interp("Iter ${iter}\n"))
+  main_tbl %>% pull(curr_x) %>% print()
+}
