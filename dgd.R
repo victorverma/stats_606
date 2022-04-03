@@ -48,3 +48,23 @@ calc_next_x <- function(id_tbl, context) {
   names(l) <- paste0("x", seq_along(next_x))
   as.data.frame(l)
 }
+
+perform_dgd_update <- function(main_tbl) {
+  p <- main_tbl %>% pull(curr_x) %>% first() %>% length()
+  columns <- c("integer", rep("double", p)) %>%
+    set_names(c("id", str_c("x", seq_len(p))))
+  context <- list(
+    grad = grad,
+    grad.default = numDeriv:::grad.default,
+    main_tbl = main_tbl
+  )
+  next_xs <- sdf_len(sc, nrow(main_tbl)) %>%
+    spark_apply(
+      calc_next_x, columns = columns, group_by = "id", context = context
+    ) %>%
+    collect() %>%
+    select(-id) %>%
+    pmap(c) %>%
+    map(unname)
+  mutate(main_tbl, curr_x = next_xs)
+}
