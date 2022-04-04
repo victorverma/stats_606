@@ -22,7 +22,7 @@ make_main_tbl <- function(f_list,
   tibble(
     f = f_list,
     grad = grad_list,
-    weights = apply(weight_mat, 1, identity, simplify = FALSE),
+    weights = apply(weight_mat, 1, identity, simplify = FALSE), # List of rows
     curr_x = init_xs,
     curr_step_size = init_step_size
   )
@@ -39,32 +39,34 @@ calc_next_x <- function(id_tbl, context) {
   curr_x <- curr_xs[[id]]
   curr_step_size <- main_tbl$curr_step_size[id]
   grad_ <- main_tbl$grad[[id]]
-  curr_weighted_sum <- Reduce(
-    `+`, mapply(`*`, weights, curr_xs, SIMPLIFY = FALSE)
+  curr_weighted_sum <- Reduce( # Sum weighted x_i's
+    `+`,
+    mapply(`*`, weights, curr_xs, SIMPLIFY = FALSE) # Mult x_i by weight i
   )
   next_x <- curr_weighted_sum - curr_step_size * grad_(curr_x)
   
-  l <- as.list(next_x)
+  l <- as.list(next_x) # l's entries are individual coordinates of next_x
   names(l) <- paste0("x", seq_along(next_x))
-  as.data.frame(l)
+  as.data.frame(l) # 1-row data frame, next_x coordinates in different cols
+  # Function given to spark_apply must return data frame
 }
 
 perform_dgd_update <- function(main_tbl) {
-  p <- main_tbl %>% pull(curr_x) %>% first() %>% length()
+  p <- main_tbl %>% pull(curr_x) %>% first() %>% length() # x lives in R^p
   columns <- c("integer", rep("double", p)) %>%
-    set_names(c("id", str_c("x", seq_len(p))))
-  context <- list(
+    set_names(c("id", str_c("x", seq_len(p)))) # Give output col types for speed
+  context <- list( # calc_next_x uses these, so must give to cluster
     grad = grad,
-    grad.default = numDeriv:::grad.default,
+    grad.default = numDeriv:::grad.default, # Dispatched by grad
     main_tbl = main_tbl
   )
-  next_xs <- sdf_len(sc, nrow(main_tbl)) %>%
+  next_xs <- sdf_len(sc, nrow(main_tbl)) %>% # Spark data frame with one col, id
     spark_apply(
       calc_next_x, columns = columns, group_by = "id", context = context
-    ) %>%
-    collect() %>%
+    ) %>% # Gives Spark data frame w/ 1 row per func, id col, p coordinate cols
+    collect() %>% # Turn Spark data frame into a plain tibble
     select(-id) %>%
-    pmap(c) %>%
+    pmap(c) %>% # Transform tibble with coordinate cols into list of vectors
     map(unname)
   mutate(main_tbl, curr_x = next_xs)
 }
