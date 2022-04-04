@@ -69,6 +69,31 @@ perform_dgd_update <- function(main_tbl) {
   mutate(main_tbl, curr_x = next_xs)
 }
 
+run_dgd <- function(sc,
+                    f_list,
+                    grad_list = NULL,
+                    init_xs,
+                    init_step_size,
+                    weight_mat,
+                    num_iters,
+                    print = FALSE) {
+  main_tbl <- make_main_tbl(
+    f_list, grad_list, init_xs, init_step_size, weight_mat
+  )
+  if (print) {
+    cat("Iter 0\n")
+    main_tbl %>% pull(curr_x) %>% print()      
+  }
+  for (iter in seq_len(num_iters)) {
+    main_tbl <- perform_dgd_update(main_tbl)
+    if (print) {
+      cat(str_interp("Iter ${iter}\n"))
+      main_tbl %>% pull(curr_x) %>% print()      
+    }
+  }
+  main_tbl$curr_x
+}
+
 # Test the code -----------------------------------------------------------
 
 sc <- spark_connect(master = "local")
