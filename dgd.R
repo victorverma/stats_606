@@ -78,13 +78,19 @@ run_dgd <- function(sc,
                     init_step_size,
                     weight_mat,
                     num_iters,
-                    print = FALSE) {
+                    print = FALSE,
+                    make_trace = FALSE) {
   main_tbl <- make_main_tbl(
     f_list, grad_list, init_xs, init_step_size, weight_mat
   )
+  
   if (print) {
     cat("Iter 0\n")
     main_tbl %>% pull(curr_x) %>% print()      
+  }
+  if (make_trace) {
+    trace <- vector("list", num_iters + 1)
+    trace[[1]] <- pull(main_tbl, curr_x)
   }
   for (iter in seq_len(num_iters)) {
     main_tbl <- perform_dgd_update(main_tbl)
@@ -92,15 +98,27 @@ run_dgd <- function(sc,
       cat(str_interp("Iter ${iter}\n"))
       main_tbl %>% pull(curr_x) %>% print()      
     }
+    if (make_trace) {
+      trace[[iter + 1]] <- pull(main_tbl, curr_x)
+    }
   }
-  main_tbl$curr_x
+  
+  if (make_trace) {
+    trace %>%
+      set_names(seq_along(.) - 1) %>%
+      map(enframe, name = "f_id", value = "curr_x") %>%
+      bind_rows(.id = "iter_num") %>%
+      mutate(iter_num = as.integer(iter_num))
+  } else {
+    main_tbl$curr_x  
+  }
 }
 
 # Test the code -----------------------------------------------------------
 
 sc <- spark_connect(master = "local")
 
-run_dgd(
+trace <- run_dgd(
   sc,
   f_list = list(
     function(x) sum(x^2) + 1,
@@ -112,5 +130,6 @@ run_dgd(
   init_step_size = 0.1,
   weight_mat = rbind(rep(1 / 3, 3), c(0.25, 0.5, 0.25), c(0.5, 0.3, 0.2)),
   num_iters = 100,
-  print = TRUE
+  print = TRUE,
+  make_trace = TRUE
 )
