@@ -80,6 +80,16 @@ run_dgd <- function(sc,
                     num_iters,
                     print = FALSE,
                     make_trace = FALSE) {
+  if (missing(init_xs)) {
+    stop("argument init_xs is missing, with no default")
+  }
+  if (missing(init_step_size)) {
+    stop("argument init_step_size is missing, with no default")
+  }
+  if (missing(weight_mat)) {
+    stop("argument weight_mat is missing, with no default")
+  }
+  
   main_tbl <- make_main_tbl(
     f_list, grad_list, init_xs, init_step_size, weight_mat
   )
