@@ -89,6 +89,13 @@ run_dgd <- function(sc,
   if (missing(weight_mat)) {
     stop("argument weight_mat is missing, with no default")
   }
+
+  if (!is.null(grad_list) && (length(f_list) != length(grad_list))) {
+    stop("there must be one gradient for each function")
+  }
+  if (length(f_list) != length(init_xs)) {
+    stop("there must be one initial value for each function")
+  }
   
   main_tbl <- make_main_tbl(
     f_list, grad_list, init_xs, init_step_size, weight_mat
