@@ -1,6 +1,15 @@
-X <- rnorm(n = 1000, 0, 1)
-epsilon <- rnorm(n = 1000, 0, 1)
-X <- cbind(rep(1, 1000),X)
+#install.packages("devtools")
+#devtools::install_github("bosafoagyare/DistGD")
+library(ggplot2)
+library(devtools)
+library(sparklyr)
+library(numDeriv)
+library(tidyverse)
+
+N <- 100000
+X <- rnorm(n = N, 0, 1)
+epsilon <- rnorm(n = N, 0, 1)
+X <- cbind(rep(1, N),X)
 
 beta <- c(-3,4)
 
@@ -8,48 +17,51 @@ f = X%*%beta
 
 p = exp(f) / (1+exp(f))
 
-Y = rbinom(1000,1,p)
-Y
-
+Y = rbinom(N,1,p)
 
 regress_loss <- function(beta_hat){
   return(sum(- Y*X%*%beta_hat + log(1 + exp(X%*%beta_hat))))
 }
 
+N_1 = round(N / 3)
+N_2 = round(N * 2 / 3)
+
+X_1 = X[1:N_1,]
+X_2 = X[(N_1 + 1):N_2,]
+X_3 = X[(N_2 + 1):N,]
+
+Y_1 = Y[1:N_1]
+Y_2 = Y[(N_1 + 1):N_2]
+Y_3 = Y[(N_2 + 1):N]
+
 regress_loss_1 <- function(beta_hat){
-  return(sum(- Y[1:300]*X[1:300,]%*%beta_hat + log(1 + exp(X[1:300,]%*%beta_hat))))
+  return(sum(- Y_1*X_1%*%beta_hat + log(1 + exp(X_1%*%beta_hat))))
 }
 
-environment(regress_loss_1) <- list2env(x = list(X = X, Y = Y))
+environment(regress_loss_1) <- list2env(x = list(X_1 = X_1, Y_1 = Y_1))
 
 regress_loss_2 <- function(beta_hat){
-  return(sum(- Y[301:700]*X[301:700,]%*%beta_hat + log(1 + exp(X[301:700,]%*%beta_hat))))
+  return(sum(- Y_2*X_2%*%beta_hat + log(1 + exp(X_2%*%beta_hat))))
 }
 
-environment(regress_loss_2) <- list2env(x = list(X = X, Y = Y))
+environment(regress_loss_2) <- list2env(x = list(X_2 = X_2, Y_2 = Y_2))
 
 regress_loss_3 <- function(beta_hat){
-  return(sum(- Y[701:1000]*X[701:1000,]%*%beta_hat + log(1 + exp(X[701:1000,]%*%beta_hat))))
+  return(sum(- Y_3*X_3%*%beta_hat + log(1 + exp(X_3%*%beta_hat))))
 }
 
-environment(regress_loss_3) <- list2env(x = list(X = X, Y = Y))
+environment(regress_loss_3) <- list2env(x = list(X_3 = X_3, Y_3 = Y_3))
 
-glm(Y ~ X, family = binomial(), data=data.frame(X = X[,2], Y = Y))
+sc <- spark_connect(master = "local")
 
-glm(Y ~ X, family = binomial(), data=data.frame(X = X[1:300,2], Y = Y[1:300]))$coefficients
-glm(Y ~ X, family = binomial(), data=data.frame(X = X[301:700,2], Y = Y[301:700]))$coefficients
-glm(Y ~ X, family = binomial(), data=data.frame(X = X[701:1000,2], Y = Y[701:1000]))$coefficients
-
-
-
-trace <- run_dgd(
+trace <- DistGD::dgd(
   sc,
   f_list = list(regress_loss_1, 
                 regress_loss_2,
                 regress_loss_3),
   grad_list = NULL,
   init_xs = list(c(-4,0), c(-1,-1), c(0,5)),
-  init_step_size = 0.02,
+  init_step_size = 0.00022,
   weight_mat = rbind(c(1/3, 1/3, 1/3), 
                      c(1/3, 1/3, 1/3), 
                      c(1/3, 1/3, 1/3)),
@@ -58,24 +70,8 @@ trace <- run_dgd(
   make_trace = TRUE
 )
 
-
-iterations <- data.frame(trace)
-
-iterations
-
-beta_0 <- c()
-beta_1 <- c()
-
-for (i in 1:33) {
-  beta_0[i] <- iterations$curr_x[[i]][1]
-  beta_1[i] <- iterations$curr_x[[i]][2]
-}
-
-iterations['beta_0'] <- beta_0
-iterations['beta_1'] <- beta_1
-
-grid <- expand.grid(beta_0 = seq(from = -7, to = 1, length.out = 100),
-                    beta_1 = seq(from = -1, to = 7, length.out = 100))
+grid <- expand.grid(beta_0 = seq(from = -7, to = 1, length.out = 10),
+                    beta_1 = seq(from = -1, to = 7, length.out = 10))
 z <- c()
 for (i in 1:dim(grid)[1]) {
   z[i] <- regress_loss(c(grid[i,1], grid[i,2]))
@@ -85,9 +81,21 @@ grid['loss'] <- z
 optimal <- glm(Y ~ X, family = binomial(), data=data.frame(X = X[,2], Y = Y))$coefficients
 optimal <- data.frame(beta_0=optimal[1], beta_1=optimal[2])
 
-m <- ggplot() + 
-  geom_path(data=iterations, aes(beta_0, beta_1, group=f_id, colour = factor(f_id))) +
+iterations_1 <- trace %>%
+  relocate(f_id) %>%
+  arrange(f_id, iter_num) %>%
+  mutate(
+    f_id = as_factor(f_id),
+    curr_x_1 = map_dbl(curr_x, 1),
+    curr_x_2 = map_dbl(curr_x, 2)
+  ) %>%
+  select(!curr_x)
+
+ggplot() +
+  geom_point(data=iterations_1, aes(curr_x_1, curr_x_2, color = iter_num)) +
+  facet_wrap(vars(f_id)) +
+  geom_path(data=iterations_1, aes(curr_x_1, curr_x_2, color = iter_num)) +
   geom_contour(data=grid, aes(beta_0, beta_1, z = loss), size=0.2) + 
-  geom_point(data=optimal, aes(beta_0, beta_1))
-m
+  geom_point(data=optimal, aes(beta_0, beta_1)) + 
+  theme_bw()
 
